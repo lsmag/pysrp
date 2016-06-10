@@ -6,7 +6,10 @@ import os.path
 import os
 import sys
 import time
-import thread
+try:
+    import thread
+except ImportError:
+    import _thread as thread  # Py3 only
 
 this_dir = os.path.dirname( os.path.abspath(__file__) )
 
