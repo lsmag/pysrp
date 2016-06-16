@@ -1,3 +1,7 @@
 build/
 *.pyc
-
+*~
+.eggs
+.tox
+dist
+srp.egg-info

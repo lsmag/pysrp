@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 
+import sys
+from setuptools import Extension
 from distutils.core      import setup
-from distutils.extension import Extension
+# from distutils.extension import Extension
+from setuptools.command.test import test as TestCommand
 
 
 long_description = '''
@@ -35,7 +38,29 @@ please refer to the `srp module documentation`_.
 
 '''
 
-ext_modules = [ Extension('srp._srp', ['srp/_srp.c',], libraries = ['ssl',], optional=True) ]
+class Tox(TestCommand):
+    user_options = [('tox-args=', 'a', "Arguments to pass to tox")]
+    def initialize_options(self):
+        TestCommand.initialize_options(self)
+        self.tox_args = None
+    def finalize_options(self):
+        TestCommand.finalize_options(self)
+        self.test_args = []
+        self.test_suite = True
+    def run_tests(self):
+        #import here, cause outside the eggs aren't loaded
+        import tox
+        import shlex
+        args = self.tox_args
+        if args:
+            args = shlex.split(self.tox_args)
+        errno = tox.cmdline(args=args)
+        sys.exit(errno)
+
+ext_modules = [ Extension('srp._srp',
+                          ['srp/_srp.c',],
+                          libraries = ['ssl',],
+                          optional=True) ]
 
 setup(name             = 'srp',
       version          = '1.0.4',
@@ -51,6 +76,8 @@ setup(name             = 'srp',
       ext_modules      = ext_modules,
       license          = "MIT",
       platforms        = "OS Independent",
+      tests_require    = ['virtualenv', 'tox'],
+      cmdclass         = {'test': Tox},
       classifiers      = [
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
