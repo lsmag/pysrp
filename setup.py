@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
+import os
 import sys
 from setuptools import Extension
 from distutils.core      import setup
-# from distutils.extension import Extension
 from setuptools.command.test import test as TestCommand
 
 
@@ -62,6 +62,15 @@ ext_modules = [ Extension('srp._srp',
                           libraries = ['ssl',],
                           optional=True) ]
 
+def read_file(filename):
+    """Read a file into a string"""
+    path = os.path.abspath(os.path.dirname(__file__))
+    filepath = os.path.join(path, filename)
+    try:
+        return open(filepath).read()
+    except IOError:
+        return ''
+
 setup(name             = 'srp',
       version          = '1.0.4',
       description      = 'Secure Remote Password',
@@ -76,6 +85,7 @@ setup(name             = 'srp',
       ext_modules      = ext_modules,
       license          = "MIT",
       platforms        = "OS Independent",
+      install_requires = read_file('requirements.txt'),
       tests_require    = ['virtualenv', 'tox'],
       cmdclass         = {'test': Tox},
       classifiers      = [

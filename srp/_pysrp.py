@@ -16,6 +16,8 @@
 import hashlib
 import os
 import binascii
+import six
+from builtins import int, pow
 
 SHA1   = 0
 SHA224 = 1
@@ -118,6 +120,12 @@ FC026E479558E4475677E9AA9E3050E2765694DFC81F56E880B96E71\
 '0x13')
 )
 
+def utf8_compat(s):
+    if six.PY2:
+        return s
+
+    return s.encode('utf-8')
+
 def get_ng( ng_type, n_hex, g_hex ):
     if ng_type < NG_CUSTOM:
         n_hex, g_hex = _ng_const[ ng_type ]
@@ -145,7 +153,12 @@ def long_to_bytes(n):
 
 
 def get_random( nbytes ):
-    return bytes_to_long( os.urandom( nbytes ) )
+    randbytes = os.urandom( nbytes )
+    if six.PY3:
+        # XXX: useless conversion
+        randbytes = list(chr(x) for x in randbytes)
+
+    return bytes_to_long( randbytes )
 
 
 def get_random_of_length( nbytes ):
@@ -154,14 +167,14 @@ def get_random_of_length( nbytes ):
 
 
 def old_H( hash_class, s1, s2 = '', s3=''):
-    if isinstance(s1, (long, int)):
+    if isinstance(s1, int):
         s1 = long_to_bytes(s1)
-    if s2 and isinstance(s2, (long, int)):
+    if s2 and isinstance(s2, int):
         s2 = long_to_bytes(s2)
-    if s3 and isinstance(s3, (long, int)):
+    if s3 and isinstance(s3, int):
         s3 = long_to_bytes(s3)
     s = s1 + s2 + s3
-    return long(hash_class(s).hexdigest(), 16)
+    return int(hash_class(s).hexdigest(), 16)
 
 
 def H( hash_class, *args, **kwargs ):
@@ -169,9 +182,9 @@ def H( hash_class, *args, **kwargs ):
 
     for s in args:
         if s is not None:
-            h.update( long_to_bytes(s) if isinstance(s, (long, int)) else s )
+            h.update( utf8_compat( long_to_bytes(s) if isinstance(s, int) else s ) )
 
-    return long( h.hexdigest(), 16 )
+    return int( h.hexdigest(), 16 )
 
 
 
@@ -180,10 +193,13 @@ def H( hash_class, *args, **kwargs ):
 #k = H(N,g)
 
 def HNxorg( hash_class, N, g ):
-    hN = hash_class( long_to_bytes(N) ).digest()
-    hg = hash_class( long_to_bytes(g) ).digest()
+    hN = hash_class( utf8_compat( long_to_bytes(N) ) ).digest()
+    hg = hash_class( utf8_compat( long_to_bytes(g) ) ).digest()
 
-    return ''.join( chr( ord(hN[i]) ^ ord(hg[i]) ) for i in range(0,len(hN)) )
+    if six.PY2:
+        return ''.join( chr( ord(hN[i]) ^ ord(hg[i]) ) for i in range(0,len(hN)) )
+    else:
+        return ''.join( chr( hN[i] ^ hg[i] ) for i in range(0,len(hN)) )
 
 
 
@@ -207,18 +223,18 @@ def create_salted_verification_key( username, password, hash_alg=SHA1, ng_type=N
 
 def calculate_M( hash_class, N, g, I, s, A, B, K ):
     h = hash_class()
-    h.update( HNxorg( hash_class, N, g ) )
-    h.update( hash_class(I).digest() )
-    h.update( long_to_bytes(s) )
-    h.update( long_to_bytes(A) )
-    h.update( long_to_bytes(B) )
+    h.update( utf8_compat( HNxorg( hash_class, N, g ) ) )
+    h.update( hash_class( utf8_compat( I ) ).digest() )
+    h.update( utf8_compat( long_to_bytes(s) ) )
+    h.update( utf8_compat( long_to_bytes(A) ) )
+    h.update( utf8_compat( long_to_bytes(B) ) )
     h.update( K )
     return h.digest()
 
 
 def calculate_H_AMK( hash_class, A, M, K ):
     h = hash_class()
-    h.update( long_to_bytes(A) )
+    h.update( utf8_compat( long_to_bytes(A) ) )
     h.update( M )
     h.update( K )
     return h.digest()
@@ -259,10 +275,12 @@ class Verifier (object):
                 self.b = bytes_to_long(bytes_b)
             else:
                 self.b = get_random_of_length( 32 )
+
+
             self.B = (k*self.v + pow(g, self.b, N)) % N
             self.u = H(hash_class, self.A, self.B)
             self.S = pow(self.A*pow(self.v, self.u, N ), self.b, N)
-            self.K = hash_class( long_to_bytes(self.S) ).digest()
+            self.K = hash_class( utf8_compat( long_to_bytes(self.S) ) ).digest()
             self.M = calculate_M( hash_class, N, g, self.I, self.s, self.A, self.B, self.K )
             self.H_AMK = calculate_H_AMK( hash_class, self.A, self.M, self.K )
 
@@ -375,7 +393,7 @@ class User (object):
 
         self.S = pow((self.B - k*self.v), (self.a + self.u*self.x), N)
 
-        self.K     = hash_class( long_to_bytes(self.S) ).digest()
+        self.K     = hash_class( utf8_compat( long_to_bytes(self.S) ) ).digest()
         self.M     = calculate_M( hash_class, N, g, self.I, self.s, self.A, self.B, self.K )
         self.H_AMK = calculate_H_AMK(hash_class, self.A, self.M, self.K)
 
